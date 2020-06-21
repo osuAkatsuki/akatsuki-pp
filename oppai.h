@@ -460,6 +460,7 @@ struct ezpp {
 	float end_time;
 	float base_ar, base_cs, base_od, base_hp;
 	int max_combo;
+	int beatmap_id; // added by akatsuki
 	char* title;
 	char* title_unicode;
 	char* artist;
@@ -766,6 +767,11 @@ int p_metadata(ezpp_t ez, slice_t* line) {
 	}
 	else if (!slice_cmp(&name, "Version")) {
 		ez->version = p_slicedup(ez, &value);
+	}
+	else if (!slice_cmp(&name, "BeatmapID")) { // added by akatsuki
+		if (sscanf(value.start, "%d", &ez->beatmap_id) != 1) {
+			return ERR_SYNTAX;
+		}
 	}
 	return n;
 }
@@ -2023,9 +2029,9 @@ int pp_std(ezpp_t ez) {
 
 	if (ez->mods & MODS_RX) { // Relax
 		if (ez->ar > 10.67f)
-			ar_bonus += 0.45f * (ez->ar - 10.67f);
-		else if (ez->ar < 8.5f)
-			ar_bonus += 0.025f * (8.5f - ez->ar);
+			ar_bonus += pow(ez->ar - 10.67f, 1.75f);
+		else if (ez->ar < 9.5f)
+			ar_bonus += 0.05f * (9.5f - ez->ar);
 	} else { // Vanilla
 		if (ez->ar > 10.33f)
 			ar_bonus += 0.3f * (ez->ar - 10.33f);
@@ -2043,7 +2049,9 @@ int pp_std(ezpp_t ez) {
 	/* hidden */
 	hd_bonus = 1.0f;
 	if (ez->mods & MODS_HD)
-		hd_bonus += 0.04f * (12.0f - ez->ar);
+		hd_bonus += (ez->mods & MODS_RX)
+			? 0.05f * (11.1f - ez->ar)
+			: 0.04f * (12.0f - ez->ar);
 
 	ez->aim_pp *= hd_bonus;
 
@@ -2072,20 +2080,15 @@ int pp_std(ezpp_t ez) {
 		// Scale OD between AR10-11.
 		// 10: 1.0x | 10.5: 1.1x | 11: 1.4x
 		? (ez->od > 10.0f)
-			? 1.0f + (float)pow(10.0f - ez->od, 2.0) / 25.0f
+			? 1.0f + (float)pow(10.0f - ez->od, 2.0f) / 25.0f
 			: 1.0f
 		: 0.98f + od_squared / 2500.0f;
 
-	/* Akatsuki's main accuracy / aim pp crossover | 0.6 - .75
-	   TODO: rework this - it's from the dark ages.
-	*/
-	const float aim_crosscheck = (ez->mods & MODS_RX)
-		? al_max(0.75f, 0.6f + (float)pow(real_acc, 3.0f) / 2.0f)
-		: 1.0f;
-
 	ez->aim_pp *= acc_bonus;
 	ez->aim_pp *= od_bonus;
-	ez->aim_pp *= aim_crosscheck;
+
+	if (ez->mods & MODS_RX) // Scale acc much harder on relax. (y=1.0 at 97.79% real acc)
+		ez->aim_pp *= 0.6f + (float)pow(real_acc, 4.0f) / 2.0f;
 
 	/* speed pp -------------------------------------------------------- */
 	if (!(ez->mods & MODS_RX)) {
@@ -2106,8 +2109,8 @@ int pp_std(ezpp_t ez) {
 
 	/* acc pp ---------------------------------------------------------- */
 	/* arbitrary values tom crafted out of trial and error */
-	ez->acc_pp = (ez->mods & MODS_RX)
-		? (float)pow(1.52163f, 5.0f + ez->od / 2.0f) * (float)pow(real_acc, 18.0f) * 2.83f
+	ez->acc_pp = (ez->mods & MODS_RX) // scale acc harder on rx
+		? (float)pow(1.52163f, ez->od) * (float)pow(real_acc, 28.0f) * 2.83f
 		: (float)pow(1.52163f, ez->od) * (float)pow(real_acc, 24.0f) * 2.83f;
 
 	/* length bonus (not the same as speed/aim length bonus) */
@@ -2118,27 +2121,45 @@ int pp_std(ezpp_t ez) {
 
 	/* total pp -------------------------------------------------------- */
 	final_multiplier = 1.12f;
-	if (ez->mods & MODS_RX) final_multiplier = 1.03f;
 	if (ez->mods & MODS_NF) final_multiplier *= 0.90f;
 	if (ez->mods & MODS_SO) final_multiplier *= 0.95f;
 
-	if (ez->mods & MODS_RX) {
-		ez->pp = (float)(
-			pow(
-				pow(ez->aim_pp, 1.158f) +
-				pow(ez->acc_pp, 1.186f),
-				0.99f / 1.1f
-			) * final_multiplier
-		);
-	} else {
-		ez->pp = (float)(
-			pow(
-				pow(ez->aim_pp, 1.1f) +
-				pow(ez->speed_pp, 1.1f) +
-				pow(ez->acc_pp, 1.1f),
-				1.0f / 1.1f
-			) * final_multiplier
-		);
+	ez->pp = (float)(
+		pow(
+			pow(ez->aim_pp, 1.1f) +
+			pow(ez->acc_pp, 1.2f) +
+			(!(ez->mods & MODS_RX)
+				? pow(ez->speed_pp, 1.1f)
+				: 0.0f
+			), 1.0f / 1.1f
+		) * final_multiplier
+	);
+
+	// This is only temporary..
+	// We've had difficulty with some maps, so here is a
+	// pretty bad way of fixing the problem until we can do
+	// it in a better way.
+	switch (ez->beatmap_id) {
+		case 1777768: // Hardware Store [skyapple mode]
+		case 11336447:// Honesty [DISHONEST]
+		case 2079597: // Honesty [RIGHTEOUSNESS OF MORALITY]
+			ez->pp *= 0.90f;
+			break;
+		case 1808605: // Louder than steel
+		case 1962833: // Akatsuki comp
+			ez->pp *= 0.85f;
+			break;
+		case 1821147: // Over the top
+			ez->pp *= 0.70f;
+			break;
+		case 1517355: // Marisa wa Taihen
+			ez->pp *= 0.65f;
+			break;
+		case 1844776: // Just press F
+			ez->pp *= 0.60f;
+			break;
+		default:
+			break;
 	}
 
 	ez->accuracy_percent = accuracy * 100.0f;
