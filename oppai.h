@@ -1978,7 +1978,11 @@ float base_pp(float stars) {
 int pp_std(ezpp_t ez) {
 	int ncircles = ez->ncircles;
 	float nobjects_over_2k = ez->nobjects / 2000.0f;
-	float length_bonus = 0.95f + 0.4f * al_min(1.0f, nobjects_over_2k) + (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f);
+	float length_bonus = (ez->nobjects > 2000
+		? (float)log10(nobjects_over_2k) * 0.5f
+		: 0.0f) + 0.95 + 0.4f * al_min(1.0f, nobjects_over_2k);
+
+	//float length_bonus = 0.95f + 0.4f * al_min(1.0f, nobjects_over_2k) + (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f);
 
 	float miss_penality = (ez->mods & MODS_RX)
 		? (float)pow(0.97f, ez->nmiss + (ez->n50 * 0.35f))
@@ -2126,8 +2130,8 @@ int pp_std(ezpp_t ez) {
 
 	ez->pp = (float)(
 		pow(
-			pow(ez->aim_pp, 1.1f) +
-			pow(ez->acc_pp, 1.2f) +
+			pow(ez->aim_pp, 1.130f) +
+			pow(ez->acc_pp, 1.225f) +
 			(!(ez->mods & MODS_RX)
 				? pow(ez->speed_pp, 1.1f)
 				: 0.0f
