@@ -15,7 +15,7 @@
 // C
 #include <dirent.h>
 #include <string.h>
-#include "oppai_old.h"
+#include "oppai.h"
 
 enum modes { standard, taiko, ctb, mania };
 enum color {

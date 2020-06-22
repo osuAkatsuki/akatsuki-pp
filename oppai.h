@@ -1982,8 +1982,6 @@ int pp_std(ezpp_t ez) {
 		? (float)log10(nobjects_over_2k) * 0.5f
 		: 0.0f) + 0.95 + 0.4f * al_min(1.0f, nobjects_over_2k);
 
-	//float length_bonus = 0.95f + 0.4f * al_min(1.0f, nobjects_over_2k) + (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f);
-
 	float miss_penality = (ez->mods & MODS_RX)
 		? (float)pow(0.97f, ez->nmiss + (ez->n50 * 0.35f))
 		: (float)pow(0.97f, ez->nmiss);
@@ -2072,7 +2070,7 @@ int pp_std(ezpp_t ez) {
 	}
 
 	/* acc bonus (bad aim can lead to bad acc) */
-	acc_bonus = ez->mods & MODS_RX
+	acc_bonus = (ez->mods & MODS_RX)
 		// scale acc bonus for rx more extremely
 		? 0.25f + accuracy / (1.0f + (1.0f / 3.0f)) // 0.25 - 1.0
 		: 0.5f + accuracy / 2.0f; // 0.5 - 1.0
@@ -2113,9 +2111,9 @@ int pp_std(ezpp_t ez) {
 
 	/* acc pp ---------------------------------------------------------- */
 	/* arbitrary values tom crafted out of trial and error */
-	ez->acc_pp = (ez->mods & MODS_RX) // scale acc harder on rx
-		? (float)pow(1.52163f, ez->od) * (float)pow(real_acc, 28.0f) * 2.83f
-		: (float)pow(1.52163f, ez->od) * (float)pow(real_acc, 24.0f) * 2.83f;
+	ez->acc_pp = // scale acc harder on rx
+		(float)pow(real_acc, ez->mods & MODS_RX ? 28 : 24) *
+		(float)pow(1.52163f, ez->od) * 2.83f;
 
 	/* length bonus (not the same as speed/aim length bonus) */
 	ez->acc_pp *= al_min(1.15f, (float)pow(ncircles / 1000.0f, 0.3f));
@@ -2128,25 +2126,22 @@ int pp_std(ezpp_t ez) {
 	if (ez->mods & MODS_NF) final_multiplier *= 0.90f;
 	if (ez->mods & MODS_SO) final_multiplier *= 0.95f;
 
-	ez->pp = (float)(
-		pow(
-			pow(ez->aim_pp, 1.130f) +
-			pow(ez->acc_pp, 1.225f) +
-			(!(ez->mods & MODS_RX)
-				? pow(ez->speed_pp, 1.1f)
-				: 0.0f
-			), 1.0f / 1.1f
-		) * final_multiplier
-	);
-
-	// This is only temporary..
-	// We've had difficulty with some maps, so here is a
-	// pretty bad way of fixing the problem until we can do
-	// it in a better way.
-	switch (ez->beatmap_id) {
-		case 1777768: // Hardware Store [skyapple mode]
-		case 11336447:// Honesty [DISHONEST]
-		case 2079597: // Honesty [RIGHTEOUSNESS OF MORALITY]
+	if (ez->mods & MODS_RX) {
+		ez->pp = (float)(
+			pow(
+				pow(ez->aim_pp, 1.1f) +
+				pow(ez->acc_pp, 1.1f),
+				1.0f / 1.1f
+			) * final_multiplier
+		);
+		// This is only temporary..
+		// We've had difficulty with some maps, so here is a
+		// pretty bad way of fixing the problem until we can do
+		// it in a better way.
+		switch (ez->beatmap_id) {
+		case 1777768:  // Hardware Store [skyapple mode]
+		case 11336447: // Honesty [DISHONEST]
+		case 2079597:  // Honesty [RIGHTEOUSNESS OF MORALITY]
 			ez->pp *= 0.90f;
 			break;
 		case 1808605: // Louder than steel
@@ -2164,6 +2159,16 @@ int pp_std(ezpp_t ez) {
 			break;
 		default:
 			break;
+		};
+	} else {
+		ez->pp = (float)(
+			pow(
+				pow(ez->aim_pp, 1.1f) +
+				pow(ez->acc_pp, 1.1f) +
+				pow(ez->speed_pp, 1.1f),
+				1.0f / 1.1f
+			) * final_multiplier
+		);
 	}
 
 	ez->accuracy_percent = accuracy * 100.0f;
