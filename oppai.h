@@ -145,8 +145,14 @@ char* errstr(int err);
   STRINGIFY(OPPAI_VERSION_MINOR) "." \
   STRINGIFY(OPPAI_VERSION_PATCH)
 
-#define al_min(a,b) (((a)<(b))?(a):(b))
-#define al_max(a,b) (((a)>(b))?(a):(b))
+#define al_min(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b; })
+#define al_max(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b; })
 
 #ifdef __unix
 #define fopen_s(pFile,filename,mode) ((*(pFile))=fopen((filename),  (mode)))==NULL
