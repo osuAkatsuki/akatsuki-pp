@@ -550,6 +550,7 @@ struct ezpp {
   float end_time;
   float base_ar, base_cs, base_od, base_hp;
   int max_combo;
+  int beatmap_id;
   char* title;
   char* title_unicode;
   char* artist;
@@ -849,6 +850,10 @@ int p_metadata(ezpp_t ez, slice_t* line) {
     ez->creator = p_slicedup(ez, &value);
   } else if (!slice_cmp(&name, "Version")) {
     ez->version = p_slicedup(ez, &value);
+  } else if (!slice_cmp(&name, "BeatmapID")) {
+    if (sscanf(value.start, "%d", &ez->beatmap_id) != 1) {
+      return ERR_SYNTAX;
+    }
   }
   return n;
 }
@@ -2208,6 +2213,31 @@ int pp_std(ezpp_t ez) {
 	      1.0f / 1.1f
 	    ) * final_multiplier
 	);
+  }
+
+  if (ez->mods & MODS_RX) {
+    switch (ez->beatmap_id) {
+      case 1808605: /* Louder than steel [ok this is epic] */
+      case 1962833: /* Akatsuki compilation [ok this is akatsuki] */
+        ez->pp *= 0.85f;
+        break;
+      case 1821147: /* over the top [Above the stars] */
+        ez->pp *= 0.70f;
+        break;
+      case 1844776: /* Just press F [Parkour's ok this is epic] */
+        ez->pp *= 0.60f;
+        break;
+      case 1777768: /* Hardware Store [skyapple mode] */
+      case 11336447: /* HONESTY [DISHONEST] */
+      case 2079597: /* HONESTY [RIGHTEOUSNESS OF MORALITY] */
+        ez->pp *= 0.90f;
+        break;
+      case 1517355:
+        ez->pp *= 0.65f;
+        break;
+      default:
+        break;
+    }
   }
 
   ez->accuracy_percent = accuracy * 100.0f;
