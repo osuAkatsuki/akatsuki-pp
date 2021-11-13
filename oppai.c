@@ -2164,6 +2164,15 @@ int pp_std(ezpp_t ez) {
     }
   }
 
+  if (ez->mods & MODS_EZ) {
+    float base_buff = 1.04f;
+
+    if (ez->ar <= 4)
+      base_buff += ((5 - ez->ar) / 100);
+
+    ez->aim_pp *= base_buff;
+  }
+
   ez->aim_pp *= hd_bonus;
   ez->aim_pp *= al_max(fl_bonus, approach_bonus);
 
