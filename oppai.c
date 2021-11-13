@@ -550,7 +550,6 @@ struct ezpp {
   float end_time;
   float base_ar, base_cs, base_od, base_hp;
   int max_combo;
-  int beatmap_id;
   char* title;
   char* title_unicode;
   char* artist;
@@ -563,6 +562,7 @@ struct ezpp {
   float aim_stars, aim_difficulty, aim_length_bonus;
   float speed_stars, speed_difficulty, speed_length_bonus;
   float pp, aim_pp, speed_pp, acc_pp;
+  int beatmap_id;
 
   /* parser */
   char section[64];
@@ -644,8 +644,8 @@ void m_free(ezpp_t ez) {
 
 /* mods ---------------------------------------------------------------- */
 
-float od10_ms[] = { 19.5f, 19.5f }; /* std, taiko */
-float od0_ms[] = { 79.5f, 49.5f };
+float od10_ms[] = { 20, 20 }; /* std, taiko */
+float od0_ms[] = { 80, 50 };
 #define AR0_MS 1800.0f
 #define AR5_MS 1200.0f
 #define AR10_MS 450.0f
@@ -1285,12 +1285,12 @@ void p_end(ezpp_t ez) {
     (1.0f - 0.7f * ((float)ez->cs - 5.0f) / 5.0f)
   );
 
-  scaling_factor = 52.0f / radius;
+  scaling_factor = 50.0f / radius;
 
   /* cs buff (originally from osuElements) */
   if (radius < CIRCLESIZE_BUFF_TRESHOLD) {
     scaling_factor *=
-      1.0f + al_min((CIRCLESIZE_BUFF_TRESHOLD - radius), 7.125f) / 36.25f;
+      1.0f + al_min((CIRCLESIZE_BUFF_TRESHOLD - radius), 5.0f) / 50.0f;
   }
 
   for (i = 0; i < ez->objects.len; ++i) {
@@ -1485,7 +1485,7 @@ int p_map_mem(ezpp_t ez, char* data, int data_size) {
 
 /* based on tom94's osu!tp aimod and osuElements */
 
-#define SINGLE_SPACING 125.0f
+#define SINGLE_SPACING 135.0f
 #define STAR_SCALING_FACTOR 0.0675f /* star rating multiplier */
 #define EXTREME_SCALING_FACTOR 0.5f /* used to mix aim/speed stars */
 #define STRAIN_STEP 400.0f /* diffcalc uses peak strains of 400ms chunks */
@@ -1523,7 +1523,7 @@ float d_spacing_weight(float distance, float delta_time,
       }
       angle_bonus = 1.0f;
       if (!is_nan(angle) && angle < SPEED_ANGLE_BONUS_BEGIN) {
-        float s = (float)sin(1.5 * (SPEED_ANGLE_BONUS_BEGIN - angle));
+        float s = (float)sin(1.4 * (SPEED_ANGLE_BONUS_BEGIN - angle));
         angle_bonus += (float)pow(s, 2) / 3.57f;
         if (angle < M_PI / 2) {
           angle_bonus = 1.28f;
@@ -1541,7 +1541,7 @@ float d_spacing_weight(float distance, float delta_time,
       return (
         (1 + (speed_bonus - 1) * 0.75f) *
         angle_bonus *
-        (0.95f + speed_bonus * (float)pow(distance / SINGLE_SPACING, 3.5))
+        (0.95f + speed_bonus * (float)pow(distance / SINGLE_SPACING, 3))
       ) / strain_time;
     }
     case DIFF_AIM: {
@@ -1627,6 +1627,9 @@ int d_update_max_strains(ezpp_t ez, float decay_factor,
   return 0;
 }
 
+#define LERP(a,b,t) a+(b-a)*t
+#define CLAMP(x, upper, lower) (al_min(upper, al_max(x, lower)))
+
 void d_weigh_strains(ezpp_t ez, float* pdiff, float* ptotal) {
   int i;
   int nstrains = 0;
@@ -1637,6 +1640,13 @@ void d_weigh_strains(ezpp_t ez, float* pdiff, float* ptotal) {
 
   strains = (float*)ez->highest_strains.data;
   nstrains = ez->highest_strains.len;
+
+  /* before sorting strains, do new sr stuff */
+  for (i = 0; i < al_min(nstrains, 10); i++)
+  { 
+    double scale = log10(LERP(1, 10, CLAMP((float)i / 10, 0, 1)));
+    strains[i] *= LERP(0.75, 1.0, scale);
+  }
 
   /* sort strains from highest to lowest */
   qsort(strains, nstrains, sizeof(float), dbl_desc);
@@ -1661,7 +1671,10 @@ int d_calc_individual(ezpp_t ez, int type) {
    * so we begin with an incremented interval end
    */
   ez->max_strain = 0.0f;
-  ez->interval_end = STRAIN_STEP * ez->speed_mul;
+  ez->interval_end = (
+    (float)ceil(ez->objects.data[0].time / (STRAIN_STEP * ez->speed_mul))
+    * STRAIN_STEP * ez->speed_mul
+  );
   ez->highest_strains.len = 0;
 
   for (i = 0; i < ez->objects.len; ++i) {
@@ -2050,17 +2063,18 @@ int pp_std(ezpp_t ez) {
     (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f)
   );
 
-  /*float miss_penality_aim = 0.97 * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775), ez->nmiss);
-  float miss_penality_speed = 0.97 * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775f), pow(ez->nmiss, 0.875f));*/
-  float miss_penality = (ez->mods & MODS_RX)
-      ? (float)pow(0.97f, ez->nmiss + (ez->n50 * 0.35f))
-      : (float)pow(0.97f, ez->nmiss);
+  float start_factor = (ez->mods & MODS_RX) ? 0.95f : 0.97f;
+  float start_factor_speed = (ez->mods & MODS_RX) ? start_factor - 0.01f : start_factor;
+  float miss_penality_aim = start_factor * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775), ez->nmiss);
+  float miss_penality_speed = start_factor_speed * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775f), pow(ez->nmiss, 0.875f));
 
-  float combo_break = (float)pow(ez->combo, 0.8f) / (float)pow(ez->max_combo, 0.8f);
+  float combo_break = (
+    (float)pow(ez->combo, 0.8f) / (float)pow(ez->max_combo, 0.8f)
+  );
   float ar_bonus;
   float final_multiplier;
-  float aim_crosscheck;
   float acc_bonus, od_bonus;
+  float od_squared;
   float hd_bonus;
 
   /* acc used for pp is different in scorev1 because it ignores sliders */
@@ -2097,123 +2111,133 @@ int pp_std(ezpp_t ez) {
   }
 
   /* ar bonus -------------------------------------------------------- */
-  ar_bonus = 1.0f;
+  ar_bonus = 0.0f;
+
+  float hit_count = ez->n300 + ez->n100 + ez->n50 + ez->nmiss;
+  float total_hit_factor = 1.0 / (1.0 + exp(-(0.007 * (hit_count - 400))));
 
   if (ez->mods & MODS_RX) {
-    /* high ar bonus */
     if (ez->ar > 10.67f) {
-      ar_bonus += 0.45f * (ez->ar - 10.67f);
+      ar_bonus = 0.45f * (ez->ar - 10.67f);
     }
-
   } else {
-    /* high ar bonus */
     if (ez->ar > 10.33f) {
-      ar_bonus += 0.3f * (ez->ar - 10.33f);
+      ar_bonus = ez->ar - 10.33f;
     }
+  }
 
-    /* low ar bonus */
-    else if (ez->ar < 8.0f) {
-      ar_bonus += 0.01f * (8.0f - ez->ar);
-    }
+  if (ez->ar < 8.0f) {
+    ar_bonus = 0.025f * (8.0f - ez->ar);
   }
 
   /* aim pp ---------------------------------------------------------- */
   ez->aim_pp = base_pp(ez->aim_stars);
   ez->aim_pp *= length_bonus;
-  ez->aim_pp *= miss_penality;
+  if (ez->nmiss > 0) {
+    ez->aim_pp *= miss_penality_aim;
+  }
   ez->aim_pp *= combo_break;
-  ez->aim_pp *= ar_bonus;
-  /*ez->aim_pp *= 1.0f + (float)al_min(ar_bonus, ar_bonus * (ez->nobjects / 1000.0f));*/
+
+  float approach_bonus = 1.0f + (0.03f + 0.37f * total_hit_factor) * ar_bonus;
 
   /* hidden */
   hd_bonus = 1.0f;
   if (ez->mods & MODS_HD) {
-    hd_bonus += 0.04f * (12.0f - ez->ar);
+    hd_bonus += (ez->mods & MODS_RX) ? 0.05f * (11.0f - ez->ar) : 0.04f * (12.0f - ez->ar);
+  }
+
+  /* flashlight */
+  float fl_bonus = 1.0f;
+  if (ez->mods & MODS_FL) {
+    float first_count = (ez->mods & MODS_RX) ? 0.3f : 0.35f;
+    float second_count = (ez->mods & MODS_RX) ? 0.25f : 0.3f;
+    float third_count = (ez->mods & MODS_RX) ? 1600.0f : 1200.0f;
+  
+    fl_bonus += first_count * al_min(1.0f, ez->nobjects / 200.0f);
+
+    if (ez->nobjects > 200) {
+      fl_bonus += second_count * al_min(1, (ez->nobjects - 200) / 300.0f);
+    }
+
+    if (ez->nobjects > 500) {
+      fl_bonus += (ez->nobjects - 500) / third_count;
+    }
   }
 
   ez->aim_pp *= hd_bonus;
-
-  /* flashlight */
-  if (ez->mods & MODS_FL) {
-    float fl_bonus = 1.0f + (0.35f * al_min(1.0f, ez->nobjects / 200.0f));
-    if (ez->nobjects > 200) {
-      fl_bonus += 0.3f * al_min(1, (ez->nobjects - 200) / 300.0f);
-    }
-    if (ez->nobjects > 500) {
-      fl_bonus += (ez->nobjects - 500) / 1200.0f;
-    }
-    ez->aim_pp *= fl_bonus;
-  }
+  ez->aim_pp *= al_max(fl_bonus, approach_bonus);
 
   /* acc bonus (bad aim can lead to bad acc) */
-  acc_bonus = 0.5f + accuracy / 2.0f;
+  if (ez->mods & MODS_RX) {
+    if (ez->od >= 10.6f) {
+      acc_bonus = (accuracy < 0.98f) ? (0.5f - (1.0f - accuracy)) + accuracy / 2.0f : 0.5f + accuracy / 2.0f;
+    } else {
+      acc_bonus = (accuracy >= 0.97f) ? 0.4f + accuracy / 2.0f : 0.3f + accuracy / 2.0f;
+    }
+  }
+  else acc_bonus = 0.5f + accuracy / 2.0f;
 
   /* od bonus (high od requires better aim timing to acc) */
-  /*od_squared = (float)pow(ez->od, 2);
-  od_bonus = 0.98f + od_squared / 2500.0f;*/
-  od_bonus = 0.98f + pow(ez->od, 2) / 2500.0f;
-  if (ez->mods & MODS_RX)
-    od_bonus = (ez->od > 10.0f) ? 1.0f + (float)pow(10.0f - ez->od, 2.0f) / 12.5f : 1.0f;
-
-  /* akatsuki's main accuracy / aim pp crosscheck | 0.6 - 1.1 (max to 0.75)
-   * 0.6+\frac{x^{24}}{2}
-   */
-  aim_crosscheck = (ez->mods & MODS_RX) ? al_max(0.75f, 0.6f + (float)pow(real_acc, 3.0f) / 2.0f) : 1.0f;
+  od_squared = (float)pow(ez->od, 2);
+  od_bonus = 0.98f + od_squared / 2500.0f;
 
   ez->aim_pp *= acc_bonus;
   ez->aim_pp *= od_bonus;
-  ez->aim_pp *= aim_crosscheck;
 
   /* speed pp -------------------------------------------------------- */
   ez->speed_pp = base_pp(ez->speed_stars);
   ez->speed_pp *= length_bonus;
-  ez->speed_pp *= miss_penality;
+  if (ez->nmiss > 0) {
+    ez->speed_pp *= miss_penality_speed;
+  }
   ez->speed_pp *= combo_break;
-  if (ez->ar > 10.33f) ez->speed_pp *= ar_bonus;
+  if (ez->ar > 10.33f) {
+    ez->speed_pp *= approach_bonus;
+  }
   ez->speed_pp *= hd_bonus;
 
   /* scale the speed value with accuracy slightly */                  
-  /*ez->speed_pp *= (0.95f + od_squared / 750) * (float)pow(accuracy, (14.5 - al_max(ez->od, 8)) / 2);*/
-  ez->speed_pp *= 0.02f + accuracy;
+  ez->speed_pp *= (0.95f + od_squared / 750) * (float)pow(accuracy, (14.5 - al_max(ez->od, 8)) / 2);
 
   /* it's important to also consider accuracy difficulty when doing that */               
-  /*ez->speed_pp *= (float) pow(0.98f, ez->n50 < ez->nobjects / 500.0f ? 0.00 : ez->n50 - ez->nobjects / 500.0f);*/
-  ez->speed_pp *= 0.96f + (float)pow(ez->od, 2) / 1600.0f;
+  ez->speed_pp *= (float) pow(0.98f, ez->n50 < ez->nobjects / 500.0f ? 0.00 : ez->n50 - ez->nobjects / 500.0f);
 
   /* acc pp ---------------------------------------------------------- */
   /* arbitrary values tom crafted out of trial and error */
-  ez->acc_pp = (float)pow(1.52163f, (ez->mods & MODS_RX) ? 5.0f + ez->od / 2.0f : ez->od) * 
-      (float)pow(real_acc, (ez->mods & MODS_RX) ? 18.0f : 14.0f) * 2.83f;
+  ez->acc_pp = (float)pow(1.52163f, ez->od) *
+    (float)pow(real_acc, 24.0f) * 2.83f;
 
   /* length bonus (not the same as speed/aim length bonus) */
   ez->acc_pp *= al_min(1.15f, (float)pow(ncircles / 1000.0f, 0.3f));
 
   if (ez->mods & MODS_HD) ez->acc_pp *= 1.08f;
-  /*if (ez->mods & MODS_FL) ez->acc_pp *= 1.02f;*/
+  if (ez->mods & MODS_FL) ez->acc_pp *= 1.02f;
 
   /* total pp -------------------------------------------------------- */
-  final_multiplier = (ez->mods & MODS_RX) ? 1.04f : 1.12f;
-  if (ez->mods & MODS_NF) final_multiplier *= 0.90f;
-  if (ez->mods & MODS_SO) final_multiplier *= 0.95f;
+  final_multiplier = 1.12f;
+  if (ez->mods & MODS_NF) final_multiplier *= (float) al_max(0.9f, 1.0f - 0.2f * ez->nmiss);
+  if (ez->mods & MODS_SO) final_multiplier *= 1.0 - pow((double)ez->nspinners / ez->nobjects, 0.85);
 
+  float acc_depression = 1.0f;
   if (ez->mods & MODS_RX) {
-  	ez->pp = (float)(
-      pow(
-        pow(ez->aim_pp, 1.158f) +
-        pow(ez->acc_pp, 1.186f),
-        0.99f / 1.1f
-      ) * final_multiplier
-    );
-  } else {
-  	ez->pp = (float)(
-	    pow(
-	      pow(ez->aim_pp, 1.1f) +
-	      pow(ez->speed_pp, 1.1f) +
-	      pow(ez->acc_pp, 1.1f),
-	      1.0f / 1.1f
-	    ) * final_multiplier
-	);
+    float streams_nerf = ez->aim_pp / (ez->speed_pp);
+    if (streams_nerf < 1.0f) {
+      acc_depression = accuracy < 1.0f ? 0.9f - (1.0f - accuracy) : 0.9f;
+      if (acc_depression > 0.0f) ez->aim_pp *= acc_depression;
+    }
   }
+
+  float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
+  float aim_factor = (ez->mods & MODS_RX) ? 1.18f : 1.1f;
+  float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : 1.1f;
+  ez->pp = (float)(
+    pow(
+      pow(ez->aim_pp, aim_factor) +
+      speed_factor + 
+      pow(ez->acc_pp, acc_factor),
+      1.0f / 1.1f
+    ) * final_multiplier
+  );
 
   if (ez->mods & MODS_RX) {
     switch (ez->beatmap_id) {
@@ -2228,17 +2252,18 @@ int pp_std(ezpp_t ez) {
         ez->pp *= 0.60f;
         break;
       case 1777768: /* Hardware Store [skyapple mode] */
-      case 11336447: /* HONESTY [DISHONEST] */
       case 2079597: /* HONESTY [RIGHTEOUSNESS OF MORALITY] */
+      case 1754777: /* Sidetracked Day [Infinity Inside] */
         ez->pp *= 0.90f;
-        break;
-      case 1517355:
-        ez->pp *= 0.65f;
         break;
       default:
         break;
     }
+  } else if (ez->beatmap_id == 1517355) { /* Marisa wa Taihen [YOLO] */
+    ez->pp *= 0.65f;
   }
+
+  ez->pp *= 0.9f;
 
   ez->accuracy_percent = accuracy * 100.0f;
 
@@ -2284,10 +2309,6 @@ int pp_taiko(ezpp_t ez) {
   /* speed mod bonuses */
   if (ez->mods & MODS_HD) {
     ez->speed_pp *= 1.025f;
-  }
-
-  if (ez->mods & MODS_FL) {
-    ez->speed_pp *= 1.05f * length_bonus;
   }
 
   /* acc scaling */
