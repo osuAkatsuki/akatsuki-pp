@@ -2272,7 +2272,7 @@ int pp_std(ezpp_t ez) {
     ez->pp *= 0.65f;
   }
 
-  ez->pp *= 0.9f;
+  if (ez->mods & MODS_RX) ez->pp *= 0.9f;
 
   ez->accuracy_percent = accuracy * 100.0f;
 
