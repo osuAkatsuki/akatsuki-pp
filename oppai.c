@@ -2057,8 +2057,10 @@ float base_pp(float stars) {
 int pp_std(ezpp_t ez) {
   int ncircles = ez->ncircles;
   float nobjects_over_2k = ez->nobjects / 2000.0f;
+
+  float bonus_factor = (ez->mods & MODS_RX) ? 0.9f : 0.95f;
   float length_bonus = (
-    0.95f +
+    bonus_factor +
     0.4f * al_min(1.0f, nobjects_over_2k) +
     (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f)
   );
@@ -2083,10 +2085,7 @@ int pp_std(ezpp_t ez) {
 
   ez->nspinners = ez->nobjects - ez->nsliders - ez->ncircles;
 
-  if (ez->max_combo <= 0) {
-    info("W: max_combo <= 0, changing to 1\n");
-    ez->max_combo = 1;
-  }
+  if (ez->max_combo <= 0) ez->max_combo = 1;
 
   accuracy = acc_calc(ez->n300, ez->n100, ez->n50, ez->nmiss);
 
@@ -2231,7 +2230,7 @@ int pp_std(ezpp_t ez) {
   if (ez->mods & MODS_RX) {
     float streams_nerf = ez->aim_pp / (ez->speed_pp);
     if (streams_nerf < 1.0f) {
-      acc_depression = accuracy < 1.0f ? 0.9f - (1.0f - accuracy) : 0.9f;
+      acc_depression = accuracy < 1.0f ? 0.93f - (1.0f - accuracy) : 0.93f;
       if (acc_depression > 0.0f) ez->aim_pp *= acc_depression;
     }
   }
@@ -2251,7 +2250,6 @@ int pp_std(ezpp_t ez) {
   if (ez->mods & MODS_RX) {
     switch (ez->beatmap_id) {
       case 1808605: /* Louder than steel [ok this is epic] */
-      case 1962833: /* Akatsuki compilation [ok this is akatsuki] */
         ez->pp *= 0.85f;
         break;
       case 1821147: /* over the top [Above the stars] */
@@ -2264,6 +2262,10 @@ int pp_std(ezpp_t ez) {
       case 2079597: /* HONESTY [RIGHTEOUSNESS OF MORALITY] */
       case 1754777: /* Sidetracked Day [Infinity Inside] */
         ez->pp *= 0.90f;
+        break;
+      case 1962833: /* Akatsuki compilation [ok this is akatsuki] */
+        if (ez->mods & MODS_DT) ez->pp *= 0.75f;
+        else ez->pp *= 0.85f;
         break;
       default:
         break;
