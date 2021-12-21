@@ -2549,15 +2549,10 @@ int pp_std(ezpp_t ez)
   float nodt_bonus = 1.0f;
   if (!(ez->mods & MODS_DT) && !(ez->mods & MODS_HT) && ez->mods & MODS_RX)
   {
-    printf("%f\n", acc_depression);
-    printf("%f\n", ez->aim_pp);
-    printf("%f\n", ez->speed_pp);
     if (acc_depression == 1.0f)
     {
       nodt_bonus = (ez->speed_pp < ez->aim_pp) ? 1.0f + (ez->nobjects / 1000.0f) * 0.01f : 1.02f;
     }
-
-    printf("%f\n", nodt_bonus);
   }
 
   float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
