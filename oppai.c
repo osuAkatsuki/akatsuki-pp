@@ -2349,7 +2349,7 @@ int pp_std(ezpp_t ez)
                         (ez->nobjects > 2000 ? (float)log10(nobjects_over_2k) * 0.5f : 0.0f));
 
   float start_factor = (ez->mods & MODS_RX) ? 0.96f : 0.97f;
-  float start_factor_speed = (ez->mods & MODS_RX) ? start_factor - 0.01f : start_factor;
+  float start_factor_speed = (ez->mods & MODS_RX) ? start_factor - 0.02f : start_factor;
   float miss_penality_aim = start_factor * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775), ez->nmiss);
   float miss_penality_speed = start_factor_speed * pow(1 - pow((double)ez->nmiss / ez->nobjects, 0.775f), pow(ez->nmiss, 0.875f));
 
@@ -2546,14 +2546,7 @@ int pp_std(ezpp_t ez)
     }
   }
 
-  float nodt_bonus = 1.0f;
-  if (!(ez->mods & MODS_DT) && !(ez->mods & MODS_HT) && ez->mods & MODS_RX)
-  {
-    if (acc_depression == 1.0f)
-    {
-      nodt_bonus = (ez->speed_pp < ez->aim_pp) ? (float)al_max(1.0f + (ez->nobjects / 1000.0f) * 0.01f, 1.02f) : 1.02f;
-    }
-  }
+  float nodt_bonus = ((ez->mods & MODS_DT) == 0 && (ez->mods & MODS_HT) == 0 && ez->mods & MODS_RX && acc_depression == 1.0f) ? 1.0f : 1.01f;
 
   float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
   float aim_factor = (ez->mods & MODS_RX) ? 1.18f * nodt_bonus : 1.1f;
@@ -2568,7 +2561,7 @@ int pp_std(ezpp_t ez)
   if (ez->mods & MODS_RX)
   {
     if (ez->mods & MODS_DT && ez->mods & MODS_HR)
-      ez->pp *= 1.02f; /* (hd)dthr bonus */
+      ez->pp *= 1.025f; /* (hd)dthr bonus */
     if (strcmp(ez->creator, "ParkourWizard") == 0)
       ez->pp *= 0.9f; /* XD */
 
@@ -2602,7 +2595,7 @@ int pp_std(ezpp_t ez)
   }
 
   if (ez->mods & MODS_RX)
-    ez->pp *= 0.93f;
+    ez->pp *= 0.925f;
   ez->accuracy_percent = accuracy * 100.0f;
 
   return 0;
