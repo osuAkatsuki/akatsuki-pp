@@ -2551,7 +2551,7 @@ int pp_std(ezpp_t ez)
   {
     if (acc_depression == 1.0f)
     {
-      nodt_bonus = (ez->speed_pp < ez->aim_pp) ? 1.0f + (ez->nobjects / 1000.0f) * 0.01f : 1.02f;
+      nodt_bonus = (ez->speed_pp < ez->aim_pp) ? (float)al_max(1.0f + (ez->nobjects / 1000.0f) * 0.01f, 1.02f) : 1.02f;
     }
   }
 
