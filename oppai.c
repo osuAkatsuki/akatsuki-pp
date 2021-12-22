@@ -2546,7 +2546,7 @@ int pp_std(ezpp_t ez)
     }
   }
 
-  float nodt_bonus = ((ez->mods & MODS_DT) == 0 && (ez->mods & MODS_HT) == 0 && ez->mods & MODS_RX && acc_depression == 1.0f) ? 1.0f : 1.01f;
+  float nodt_bonus = ((ez->mods & MODS_DT) == 0 && (ez->mods & MODS_HT) == 0 && ez->mods & MODS_RX && acc_depression == 1.0f) ? 1.01f : 1.0f;
 
   float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
   float aim_factor = (ez->mods & MODS_RX) ? 1.18f * nodt_bonus : 1.1f;
