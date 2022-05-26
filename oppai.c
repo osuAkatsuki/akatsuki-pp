@@ -2584,7 +2584,7 @@ int pp_std(ezpp_t ez)
   float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : (ez->mods & MODS_AP) ? 1.12f : 1.1f;
 
   ez->pp = (float)(pow(
-                       pow(aim_factor) +
+                       aim_factor +
                            speed_factor +
                            pow(ez->acc_pp, acc_factor),
                        1.0f / 1.1f) *
