@@ -2549,10 +2549,11 @@ int pp_std(ezpp_t ez)
   float nodt_bonus = ((ez->mods & MODS_DT) == 0 && (ez->mods & MODS_HT) == 0 && ez->mods & MODS_RX && acc_depression == 1.0f) ? 1.01f : 1.0f;
 
   float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
-  float aim_factor = (ez->mods & MODS_RX) ? 1.18f * nodt_bonus : 1.1f;
+  float aim_factor = (ez->mods & MODS_RX) ? pow(ez->aim_pp, 1.18f * nodt_bonus) : (ez->mods & MODS_AP) ? 0.0f : pow(ez->aim_pp, 1.1f);
   float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : 1.1f;
+
   ez->pp = (float)(pow(
-                       pow(ez->aim_pp, aim_factor) +
+                       pow(aim_factor) +
                            speed_factor +
                            pow(ez->acc_pp, acc_factor),
                        1.0f / 1.1f) *
@@ -2588,10 +2589,6 @@ int pp_std(ezpp_t ez)
     default:
       break;
     }
-  }
-  else if (ez->beatmap_id == 1517355)
-  { /* Marisa wa Taihen [YOLO] */
-    ez->pp *= 0.65f;
   }
 
   if (ez->mods & MODS_RX)

@@ -2,6 +2,10 @@
 
 This is Akatsuki's pp system, a modified version of oppai-ng with relax in mind.
 
+## Note
+
+This system is only used for Relax and Autopilot pp.
+
 ## Usage
 
 To build oppai for cmd line usage, use `./build`.
