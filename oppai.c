@@ -2514,6 +2514,32 @@ int pp_std(ezpp_t ez)
   /* it's important to also consider accuracy difficulty when doing that */
   ez->speed_pp *= (float)pow(0.98f, ez->n50 < ez->nobjects / 500.0f ? 0.00 : ez->n50 - ez->nobjects / 500.0f);
 
+  if (ez->mods & MODS_AP) {
+    ez->speed_pp *= acc_bonus;
+    ez->speed_pp *= od_bonus;
+
+    /* flashlight */
+    float fl_bonus = 1.0f;
+    if (ez->mods & MODS_FL)
+    {
+      float first_count = 0.25f;
+      float second_count = 0.2f;
+      float third_count = 1100.0f;
+
+      fl_bonus += first_count * al_min(1.0f, ez->nobjects / 200.0f);
+
+      if (ez->nobjects > 200)
+      {
+        fl_bonus += second_count * al_min(1, (ez->nobjects - 200) / 300.0f);
+      }
+
+      if (ez->nobjects > 500)
+      {
+        fl_bonus += (ez->nobjects - 500) / third_count;
+      }
+    }
+  }
+
   /* acc pp ---------------------------------------------------------- */
   /* arbitrary values tom crafted out of trial and error */
   ez->acc_pp = (float)pow(1.52163f, ez->od) *
@@ -2548,9 +2574,9 @@ int pp_std(ezpp_t ez)
 
   float nodt_bonus = ((ez->mods & MODS_DT) == 0 && (ez->mods & MODS_HT) == 0 && ez->mods & MODS_RX && acc_depression == 1.0f) ? 1.01f : 1.0f;
 
-  float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : pow(ez->speed_pp, 1.1f);
+  float speed_factor = (ez->mods & MODS_RX) ? pow(ez->speed_pp, 0.83f * acc_depression) : (ez->mods & MODS_AP) ? pow(ez->speed_pp, 1.12f) : pow(ez->speed_pp, 1.1f);
   float aim_factor = (ez->mods & MODS_RX) ? pow(ez->aim_pp, 1.18f * nodt_bonus) : (ez->mods & MODS_AP) ? 0.0f : pow(ez->aim_pp, 1.1f);
-  float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : 1.1f;
+  float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : (ez->mods & MODS_AP) ? 1.12f : 1.1f;
 
   ez->pp = (float)(pow(
                        pow(aim_factor) +
