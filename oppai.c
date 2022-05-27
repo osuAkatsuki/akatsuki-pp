@@ -2538,6 +2538,11 @@ int pp_std(ezpp_t ez)
         fl_bonus += (ez->nobjects - 500) / third_count;
       }
     }
+
+    ez->speed_pp *= fl_bonus;
+
+    /* penalise 50s! */
+    ez->speed_pp *= pow(0.98f, ez->n50 < ez->nobjects / 500.0f ? 0.00 : ez->n50 - ez->nobjects / 500.0f);
   }
 
   /* acc pp ---------------------------------------------------------- */
@@ -2579,7 +2584,7 @@ int pp_std(ezpp_t ez)
   float acc_factor = (ez->mods & MODS_RX) ? 1.15f * acc_depression : (ez->mods & MODS_AP) ? 1.12f : 1.1f;
 
   ez->pp = (float)(pow(
-                       pow(aim_factor) +
+                       aim_factor +
                            speed_factor +
                            pow(ez->acc_pp, acc_factor),
                        1.0f / 1.1f) *
