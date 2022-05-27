@@ -2617,8 +2617,6 @@ int pp_std(ezpp_t ez)
     }
   }
 
-  if (ez->mods & MODS_RX)
-    ez->pp *= 0.925f;
   ez->accuracy_percent = accuracy * 100.0f;
 
   return 0;
